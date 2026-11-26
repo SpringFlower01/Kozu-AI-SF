@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KozuAI - イラスト構図提案アシスタント</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-sub: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-soft: #eef2ff;
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-badge {
+      background: var(--primary);
+      color: #fff;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 0.9rem;
+    }
+
+    .logo-sub {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--surface-sub);
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+
+    .mode-switch {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface-sub);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .mode-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 12px;
+      border-radius: 7px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-btn.active {
+      background: var(--surface);
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 24px;
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .container { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .panel-title {
+      font-size: 0.98rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .field-group {
+      margin-bottom: 16px;
+    }
+
+    .field-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .field-hint {
+      font-weight: 500;
+      font-size: 0.72rem;
+    }
+
+    .presets {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .preset-chip {
+      text-align: left;
+      background: var(--surface-sub);
+      border: 1px solid transparent;
+      padding: 8px 12px;
+      border-radius: 9px;
+      font-size: 0.8rem;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .preset-chip:hover {
+      background: var(--primary-soft);
+      border-color: #c7d2fe;
+      color: var(--primary);
+    }
+
+    .chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .select-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .select-chip:hover {
+      border-color: #a5b4fc;
+      background: #f8faff;
+    }
+
+    .select-chip.active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 105px;
+      padding: 11px 13px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.88rem;
+      color: var(--text);
+      background: var(--bg);
+      resize: vertical;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+    }
+
+    .generate-btn {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .generate-btn:hover { background: var(--primary-hover); }
+    .generate-btn:active { transform: scale(0.99); }
+    .generate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .mode-note {
+      margin-top: 12px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: var(--surface-sub);
+      padding: 9px 11px;
+      border-radius: 8px;
+      line-height: 1.5;
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .result-header h2 { font-size: 1.05rem; font-weight: 700; }
+
+    .status-pill {
+      font-size: 0.78rem;
+      color: var(--primary);
+      background: var(--primary-soft);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    .empty-state {
+      background: var(--surface);
+      border: 1px dashed #cbd5e1;
+      border-radius: var(--radius);
+      padding: 56px 24px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .empty-state p { font-size: 0.92rem; margin-top: 8px; }
+
+    .cards-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .comp-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      display: grid;
+      grid-template-columns: 205px 1fr;
+      gap: 20px;
+      align-items: center;
+      transition: border-color 0.2s;
+    }
+
+    .comp-card:hover { border-color: #c7d2fe; }
+
+    @media (max-width: 640px) {
+      .comp-card { grid-template-columns: 1fr; }
+    }
+
+    .sketch-box {
+      background: var(--surface-sub);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sketch-scale-tag {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: #ffffff;
+      border: 1px solid #c7d2fe;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .sketch-caption {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .card-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-soft);
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+    }
+
+    .card-title { font-size: 1.02rem; font-weight: 700; margin-bottom: 12px; }
+
+    .spec-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .spec-item {
+      font-size: 0.86rem;
+      display: grid;
+      grid-template-columns: 105px 1fr;
+      gap: 8px;
+    }
+
+    .spec-label { font-weight: 700; color: var(--text-muted); font-size: 0.8rem; }
+
+    .error-box {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      border-radius: var(--radius);
+      padding: 20px;
+      font-size: 0.9rem;
+    }
+
+    .loader {
+      display: none;
+      text-align: center;
+      padding: 48px 20px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.92rem;
+    }
+
+    .loader-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .loader-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 14px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <div class="logo-badge">構</div>
+      <span>KozuAI</span>
+      <span class="logo-sub">イラスト構図アドバイザー</span>
+    </div>
+
+    <div class="mode-switch">
+      <button type="button" class="mode-btn active" id="btnDemoMode" onclick="setMode('demo')">プレビュー</button>
+      <button type="button" class="mode-btn" id="btnApiMode" onclick="setMode('api')">AI生成モード</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <div class="panel-title">描きたいイラストの条件</div>
+
+      <div class="field-group">
+        <span class="field-label">サンプルから選ぶ</span>
+        <div class="presets">
+          <button type="button" class="preset-chip" onclick="applyPreset(0)">
+            ⚡ 1時間で描ける臨場感バトル構図
+          </button>
+          <button type="button" class="preset-chip" onclick="applyPreset(1)">
+            🌇 夕暮れの屋上・エモーショナルな全身立ち絵
+          </button>
+          <button type="button" class="preset-chip" onclick="applyPreset(2)">
+            🔮 魔法発動・膝より上でポーズを見せる構図
+          </button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <span class="field-label">1. 描画範囲（ショットサイズ）</span>
+        <div class="chip-grid" id="scaleChips">
+          <button type="button" class="select-chip" data-val="face_only" onclick="selectScale('face_only')">顔のみ</button>
+          <button type="button" class="select-chip" data-val="bust_up" onclick="selectScale('bust_up')">胸より上</button>
+          <button type="button" class="select-chip" data-val="waist_up" onclick="selectScale('waist_up')">腰より上</button>
+          <button type="button" class="select-chip" data-val="knee_up" onclick="selectScale('knee_up')">膝より上</button>
+          <button type="button" class="select-chip" data-val="full_body" onclick="selectScale('full_body')">全身</button>
+          <button type="button" class="select-chip active" data-val="other" onclick="selectScale('other')">その他（自由記述）</button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <span class="field-label">2. 雰囲気・テイスト</span>
+        <div class="chip-grid" id="moodChips">
+          <button type="button" class="select-chip" data-val="cute" onclick="selectMood('cute')">かわいい</button>
+          <button type="button" class="select-chip" data-val="cool" onclick="selectMood('cool')">クール</button>
+          <button type="button" class="select-chip" data-val="emotional" onclick="selectMood('emotional')">エモい</button>
+          <button type="button" class="select-chip" data-val="dynamic" onclick="selectMood('dynamic')">迫力・バトル</button>
+          <button type="button" class="select-chip active" data-val="other" onclick="selectMood('other')">その他（自由記述）</button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">
+          <span>3. 自由記述・補足シチュエーション</span>
+          <span class="field-hint" id="promptHint">自由に条件を記述できます</span>
+        </div>
+        <textarea id="promptInput" placeholder="例：放課後の教室で窓の外を見ている構図。作画時間は1時間半くらいで、逆光を活かしたい。">かっこよく臨場感のあるイラストを1時間で描きたい。雰囲気を出しつつ作画コストが高すぎない構図を提案して。</textarea>
+      </div>
+
+      <button type="button" class="generate-btn" id="submitBtn" onclick="handleGenerate()">
+        構図を3つ提案する
+      </button>
+
+      <div class="mode-note" id="modeNote">
+        💡 <strong>プレビュー中：</strong>通信なしで、構図ガイド図解付きのサンプル提案を即座に体験できます（約0.5秒）。
+      </div>
+    </section>
+
+    <section>
+      <div class="result-header">
+        <h2>提案された構図プラン</h2>
+        <span class="status-pill" id="statusPill">待機中</span>
+      </div>
+
+      <div class="empty-state" id="emptyState">
+        <strong>左側の条件を選んで「構図を3つ提案する」を押してください</strong>
+        <p>「描画範囲」と「雰囲気」を選ぶだけでも、AIがシーンを補完して3つのラフ案を生成します。</p>
+      </div>
+
+      <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <div class="loader-title" id="loaderTitle">AIが構図プランとアングルを深く設計しています...</div>
+        <div class="loader-sub" id="loaderSub">目安：通常20〜40秒・最大約1分30秒</div>
+      </div>
+
+      <div id="resultContainer"></div>
+    </section>
+  </main>
+
+  <script>
+    let currentMode = "demo";
+    let selectedPresetIndex = 0;
+    let selectedScale = "other";
+    let selectedMood = "other";
+    let timerInterval = null;
+
+    const SCALE_LABELS = {
+      face_only: "顔のみ",
+      bust_up: "バストアップ（胸より上）",
+      waist_up: "腰より上",
+      knee_up: "膝より上",
+      full_body: "全身"
+    };
+
+    const PRESET_CONFIGS = [
+      {
+        text: "かっこよく臨場感のあるイラストを1時間で描きたい。雰囲気を出しつつ作画コストが高すぎない構図を提案して。",
+        scale: "other",
+        mood: "dynamic"
+      },
+      {
+        text: "放課後の夕暮れの屋上で、主人公が風を受けながら遠くを見つめている切ない雰囲気の全身イラストを描きたい。",
+        scale: "full_body",
+        mood: "emotional"
+      },
+      {
+        text: "魔法使いが杖を構えて魔法を発動する瞬間。衣装とポーズを見せたいので膝より上の構図を中心に提案して。",
+        scale: "knee_up",
+        mood: "cool"
+      }
+    ];
+
+    const DEMO_DATA = [
+      [
+        {
+          tag: "提案 01｜腕の動き・武器アピール",
+          title: "対角線ローアングル＋手前ぼかし（腰より上）",
+          angle: "地面すれすれから見上げる強いローアングル（煽り）。広角レンズ風に遠近感を強調。",
+          layout: "画面左下に武器のシルエットを大きく配置し、右側に腰より上のポーズでキャラを配置。",
+          gaze: "手前のぼかした武器（左下）→ キャラの顔（右上）へと対角線上に誘導。",
+          composition_style: "diagonal_action",
+          subject_position: "right",
+          subject_scale: "waist_up",
+          gaze_direction: "diagonal_up",
+          visual_element: "foreground_blur"
+        },
+        {
+          tag: "提案 02｜シルエット映え・時短",
+          title: "逆光シルエット＋三分割法（バストアップ）",
+          angle: "キャラの目線とほぼ同じ高さのアイレベル。左側に大きな余白を取り、逆光の光源を配置。",
+          layout: "右縦線上に胸より上のバストアップを寄せ、左上に強い逆光を配置して細部の描き込みを削減。",
+          gaze: "左上の強い光から、光が当たって浮かび上がる顔の輪郭・瞳へと視線を誘導。",
+          composition_style: "wide_scenery",
+          subject_position: "right",
+          subject_scale: "bust_up",
+          gaze_direction: "left_to_right",
+          visual_element: "sun_or_moon"
+        },
+        {
+          tag: "提案 03｜一点集中・1時間時短特化",
+          title: "瓦礫フレームイン＋日の丸クローズアップ（顔のみ）",
+          angle: "顔のみにぐっと寄ったクローズアップ。体を描かないため1時間でも瞳や髪の塗り込みに集中できる。",
+          layout: "画面の四隅を暗いシルエット（瓦礫や煙）で囲み、中央にキャラの顔だけを大きく配置。",
+          gaze: "周囲の暗いフレームが額縁となり、見る人の視線を中央の瞳へロックする。",
+          composition_style: "frame_in_frame",
+          subject_position: "center",
+          subject_scale: "face_only",
+          gaze_direction: "converge_center",
+          visual_element: "speed_lines"
+        }
+      ],
+      [
+        {
+          tag: "提案 01｜余白と空気感",
+          title: "三分割法・広大な夕空と屋上立ち姿（全身）",
+          angle: "やや見上げるローアングルで、画面の7割を夕焼け空と雲が占める開放的な全身アングル。",
+          layout: "下部に屋上の床面を取り、右側に風を受けるキャラの全身立ち姿、左上に沈む夕日を配置。",
+          gaze: "左上の夕日から斜め下へ視線が降り、夕日に照らされたキャラの全身シルエットへと着地する。",
+          composition_style: "low_angle",
+          subject_position: "right",
+          subject_scale: "full_body",
+          gaze_direction: "left_to_right",
+          visual_element: "sun_or_moon"
+        },
+        {
+          tag: "提案 02｜ドラマチックな奥行き",
+          title: "フェンスの消失点を使った一点透視（全身）",
+          angle: "金網フェンスに沿った斜め横からのアングル。奥に向かって強いパースを効かせる。",
+          layout: "右側の手前から奥へ向かうパース線の先に、左寄りのキャラ全身立ち姿を配置。",
+          gaze: "手前から奥へ狭まるフェンスのパース線がすべてキャラの立ち位置に収束し、視線が集中する。",
+          composition_style: "wide_scenery",
+          subject_position: "left",
+          subject_scale: "full_body",
+          gaze_direction: "right_to_left",
+          visual_element: "architecture_or_fence"
+        },
+        {
+          tag: "提案 03｜足元からの仰角",
+          title: "空抜けローアングル・全身シルエット構図（全身）",
+          angle: "地面すれすれから全身を見上げるアングル。背景の建物を省き、雲とキャラだけで魅せる。",
+          layout: "画面中央にキャラの全身を足先まで堂々と配置し、背後に流れる雲で動きを演出。",
+          gaze: "足元から頭頂部へと視線を一気に引き上げ、空へ抜ける開放感を作る。",
+          composition_style: "low_angle",
+          subject_position: "center",
+          subject_scale: "full_body",
+          gaze_direction: "bottom_to_top",
+          visual_element: "nature_or_clouds"
+        }
+      ],
+      [
+        {
+          tag: "提案 01｜衣装とポーズ重視",
+          title: "魔法陣パース＋ローブの広がり構図（膝より上）",
+          angle: "やや斜め下からのアングルで、膝より上の立ち姿と衣装の裾の広がりをダイナミックに見せる。",
+          layout: "右側に膝より上の魔法使いを配置し、左下の魔法陣から光の粒子を立ち昇らせる。",
+          gaze: "左下の魔法陣から光の軌跡を伝って、術者の表情へと視線が引き込まれる。",
+          composition_style: "diagonal_action",
+          subject_position: "right",
+          subject_scale: "knee_up",
+          gaze_direction: "diagonal_up",
+          visual_element: "magic_or_light"
+        },
+        {
+          tag: "提案 02｜神秘的・安定感",
+          title: "俯瞰アングル＋螺旋エフェクト構図（膝より上）",
+          angle: "やや俯瞰（見下ろし）気味のアングルで、足元をフレームアウトさせて浮遊感を演出。",
+          layout: "左寄りに膝より上のキャラを配置し、右側の空間を大きく使って風と光の軌跡を描く。",
+          gaze: "右側から大きな弧を描いて巻き込む光の軌跡が、そのままキャラの顔へと視線を案内する。",
+          composition_style: "high_angle",
+          subject_position: "left",
+          subject_scale: "knee_up",
+          gaze_direction: "right_to_left",
+          visual_element: "nature_or_clouds"
+        },
+        {
+          tag: "提案 03｜上半身の魔力集中",
+          title: "手元の発光球体から照らし出す煽り構図（腰より上）",
+          angle: "正面やや煽りのウエストショット。腰より上の両手の構えと強い光源だけで顔を下から照らす。",
+          layout: "画面中央に腰より上のキャラを配置し、手元の発光エフェクトと顔に視線を集める。",
+          gaze: "最も明るい手元の光源から、下からの光で照らされた表情へと真っ直ぐ視線が上がる。",
+          composition_style: "low_angle",
+          subject_position: "center",
+          subject_scale: "waist_up",
+          gaze_direction: "bottom_to_top",
+          visual_element: "magic_or_light"
+        }
+      ]
+    ];
+
+    function selectScale(val) {
+      selectedScale = val;
+      document.querySelectorAll("#scaleChips .select-chip").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.val === val);
+      });
+      updatePromptHint();
+    }
+
+    function selectMood(val) {
+      selectedMood = val;
+      document.querySelectorAll("#moodChips .select-chip").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.val === val);
+      });
+      updatePromptHint();
+    }
+
+    function updatePromptHint() {
+      const hint = document.getElementById("promptHint");
+      const input = document.getElementById("promptInput");
+      if (selectedScale === "other" && selectedMood === "other") {
+        hint.textContent = "自由に条件を記述できます";
+        input.placeholder = "例：かっこよく臨場感のあるイラストを1時間で描きたい。雰囲気を出しつつ作画コストが高すぎない構図を提案して。";
+      } else {
+        hint.textContent = "空欄のままでもAIが自動補完します";
+        input.placeholder = "補足があれば入力（例：制服姿、屋外、1時間で描きたい等。空欄のままでも生成できます）";
+      }
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById("btnDemoMode").classList.toggle("active", mode === "demo");
+      document.getElementById("btnApiMode").classList.toggle("active", mode === "api");
+
+      const note = document.getElementById("modeNote");
+      if (mode === "demo") {
+        note.innerHTML = "💡 <strong>プレビュー中：</strong>通信なしで、構図ガイド図解付きのサンプル提案を即座に体験できます（約0.5秒）。";
+      } else {
+        note.innerHTML = "✨ <strong>AI生成モード中：</strong>深く思考して構図と専用図解を作成します（<strong>通常20〜40秒／最大約1分30秒</strong>かかります）。";
+      }
+    }
+
+    function applyPreset(index) {
+      selectedPresetIndex = index;
+      const cfg = PRESET_CONFIGS[index];
+      document.getElementById("promptInput").value = cfg.text;
+      selectScale(cfg.scale);
+      selectMood(cfg.mood);
+      if (currentMode === "demo") {
+        handleGenerate();
+      }
+    }
+
+    function startLoadingTimer(isApiMode) {
+      const titleEl = document.getElementById("loaderTitle");
+      const subEl = document.getElementById("loaderSub");
+      if (timerInterval) clearInterval(timerInterval);
+
+      if (!isApiMode) {
+        titleEl.textContent = "サンプル構図を読み込んでいます...";
+        subEl.textContent = "まもなく表示されます";
+        return;
+      }
+
+      const startTime = Date.now();
+      titleEl.textContent = "AIが構図プランとアングルを深く設計しています...";
+      subEl.textContent = "目安：通常20〜40秒・最大約1分30秒（経過：0.0秒）";
+
+      timerInterval = setInterval(() => {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        if (elapsed < 15.0) {
+          titleEl.textContent = "AIが構図プランとアングルを深く設計しています...";
+        } else if (elapsed < 35.0) {
+          titleEl.textContent = "視線誘導と専用ラフ図解データを構築しています...";
+        } else {
+          titleEl.textContent = "じっくり思考中です。まもなく完了します（最大1分30秒ほどかかる場合があります）...";
+        }
+        subEl.textContent = `目安：通常20〜40秒・最大約1分30秒（経過：${elapsed}秒）`;
+      }, 100);
+    }
+
+    function stopLoadingTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+
+    function normalizeScale(rawScale) {
+      if (["face_only", "bust_up", "waist_up", "knee_up", "full_body"].includes(rawScale)) {
+        return rawScale;
+      }
+      if (rawScale === "close_up" || rawScale === "large") return "face_only";
+      if (rawScale === "small") return "full_body";
+      return "bust_up";
+    }
+
+    function createSmartSketchSVG(item, idx) {
+      const styles = ["low_angle", "wide_scenery", "frame_in_frame", "diagonal_action", "high_angle", "close_up"];
+      const positions = ["right", "left", "center", "bottom_right", "bottom_left"];
+      const gazes = ["diagonal_up", "left_to_right", "converge_center", "right_to_left", "bottom_to_top"];
+      const visuals = ["foreground_blur", "sun_or_moon", "magic_or_light", "architecture_or_fence", "nature_or_clouds", "speed_lines"];
+
+      const style = styles.includes(item.composition_style) ? item.composition_style : styles[idx % styles.length];
+      const pos = positions.includes(item.subject_position) ? item.subject_position : positions[idx % positions.length];
+      const gaze = gazes.includes(item.gaze_direction) ? item.gaze_direction : gazes[idx % gazes.length];
+      const visual = visuals.includes(item.visual_element) ? item.visual_element : visuals[idx % visuals.length];
+      const scale = normalizeScale(item.subject_scale);
+
+      const posXMap = { left: 48, bottom_left: 52, center: 85, right: 122, bottom_right: 118 };
+      const sx = posXMap[pos] || 85;
+      const isBottom = pos.includes("bottom");
+
+      let headR = 14;
+      let sy = 40;
+      let subjectSvg = "";
+
+      if (scale === "face_only") {
+        headR = 26;
+        sy = 50;
+        subjectSvg = `
+          <path d="M${sx - 13},110 L${sx - 11},74 L${sx + 11},74 L${sx + 13},110 Z" fill="rgba(79, 70, 229, 0.25)" stroke="#4f46e5" stroke-width="1.2"/>
+          <circle cx="${sx}" cy="${sy}" r="${headR}" fill="rgba(79, 70, 229, 0.88)"/>
+        `;
+      } else if (scale === "bust_up") {
+        headR = 15;
+        sy = isBottom ? 48 : 38;
+        subjectSvg = `
+          <path d="M${sx - 30},110 Q${sx - 26},62 ${sx},60 Q${sx + 26},62 ${sx + 30},110 Z" fill="rgba(79, 70, 229, 0.28)" stroke="#4f46e5" stroke-width="1.2"/>
+          <circle cx="${sx}" cy="${sy}" r="${headR}" fill="rgba(79, 70, 229, 0.88)"/>
+        `;
+      } else if (scale === "waist_up") {
+        headR = 11;
+        sy = 26;
+        subjectSvg = `
+          <path d="M${sx - 17},42 L${sx - 23},74 L${sx - 16},104" fill="none" stroke="#4f46e5" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+          <path d="M${sx + 17},42 L${sx + 23},74 L${sx + 16},104" fill="none" stroke="#4f46e5" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+          <polygon points="${sx - 17},40 ${sx + 17},40 ${sx + 11},84 ${sx + 15},110 ${sx - 15},110 ${sx - 11},84" fill="rgba(79, 70, 229, 0.30)" stroke="#4f46e5" stroke-width="1.2"/>
+          <circle cx="${sx}" cy="${sy}" r="${headR}" fill="rgba(79, 70, 229, 0.90)"/>
+        `;
+      } else if (scale === "knee_up") {
+        headR = 8.5;
+        sy = 19;
+        subjectSvg = `
+          <path d="M${sx - 13},32 L${sx - 18},56 L${sx - 15},74" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+          <path d="M${sx + 13},32 L${sx + 18},56 L${sx + 15},74" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+          <line x1="${sx - 5.5}" y1="64" x2="${sx - 8}" y2="110" stroke="#4f46e5" stroke-width="5.2" stroke-linecap="round" opacity="0.8"/>
+          <line x1="${sx + 5.5}" y1="64" x2="${sx + 8}" y2="110" stroke="#4f46e5" stroke-width="5.2" stroke-linecap="round" opacity="0.8"/>
+          <polygon points="${sx - 13},30 ${sx + 13},30 ${sx + 8},54 ${sx + 11},66 ${sx - 11},66 ${sx - 8},54" fill="rgba(79, 70, 229, 0.34)" stroke="#4f46e5" stroke-width="1.2"/>
+          <circle cx="${sx}" cy="${sy}" r="${headR}" fill="rgba(79, 70, 229, 0.92)"/>
+        `;
+      } else {
+        headR = 6.5;
+        sy = 16;
+        subjectSvg = `
+          <line x1="${sx - 16}" y1="100" x2="${sx + 16}" y2="100" stroke="#94a3b8" stroke-width="1.2"/>
+          <path d="M${sx - 10},26 L${sx - 14},45 L${sx - 12},59" fill="none" stroke="#4f46e5" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+          <path d="M${sx + 10},26 L${sx + 14},45 L${sx + 12},59" fill="none" stroke="#4f46e5" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
+          <line x1="${sx - 4}" y1="51" x2="${sx - 7}" y2="98" stroke="#4f46e5" stroke-width="4" stroke-linecap="round" opacity="0.82"/>
+          <line x1="${sx + 4}" y1="51" x2="${sx + 7}" y2="98" stroke="#4f46e5" stroke-width="4" stroke-linecap="round" opacity="0.82"/>
+          <polygon points="${sx - 10},25 ${sx + 10},25 ${sx + 6},43 ${sx + 9},52 ${sx - 9},52 ${sx - 6},43" fill="rgba(79, 70, 229, 0.36)" stroke="#4f46e5" stroke-width="1.2"/>
+          <circle cx="${sx}" cy="${sy}" r="${headR}" fill="rgba(79, 70, 229, 0.92)"/>
+        `;
+      }
+
+      let baseLayer = "";
+      let tilt = 0;
+      if (style === "low_angle") {
+        baseLayer = `
+          <path d="M0,98 Q85,88 170,98 L170,110 L0,110 Z" fill="rgba(148, 163, 184, 0.24)"/>
+          <line x1="0" y1="110" x2="${sx}" y2="${sy}" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3 3"/>
+          <line x1="170" y1="110" x2="${sx}" y2="${sy}" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3 3"/>
+        `;
+      } else if (style === "high_angle") {
+        baseLayer = `
+          <rect x="0" y="0" width="170" height="18" fill="rgba(148, 163, 184, 0.16)"/>
+          <line x1="0" y1="18" x2="170" y2="18" stroke="#94a3b8" stroke-width="1.2"/>
+          <line x1="0" y1="100" x2="170" y2="100" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 3"/>
+        `;
+      } else if (style === "diagonal_action") {
+        tilt = -6;
+        baseLayer = `
+          <line x1="0" y1="110" x2="170" y2="0" stroke="#93c5fd" stroke-width="1.4" stroke-dasharray="4 3"/>
+          <line x1="0" y1="85" x2="140" y2="0" stroke="#e2e8f0" stroke-width="1"/>
+        `;
+      } else if (style === "frame_in_frame") {
+        baseLayer = `
+          <path d="M0,0 L44,0 L18,38 L0,56 Z" fill="rgba(100, 116, 139, 0.36)"/>
+          <path d="M170,0 L126,0 L152,38 L170,56 Z" fill="rgba(100, 116, 139, 0.36)"/>
+          <path d="M0,110 L48,110 L26,80 L0,70 Z" fill="rgba(100, 116, 139, 0.36)"/>
+          <path d="M170,110 L122,110 L144,80 L170,70 Z" fill="rgba(100, 116, 139, 0.36)"/>
+        `;
+      } else if (style === "close_up") {
+        baseLayer = `
+          <rect x="12" y="10" width="146" height="90" rx="4" fill="none" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4 3"/>
+        `;
+      } else {
+        baseLayer = `
+          <line x1="56" y1="0" x2="56" y2="110" stroke="#cbd5e1" stroke-width="1"/>
+          <line x1="113" y1="0" x2="113" y2="110" stroke="#cbd5e1" stroke-width="1"/>
+          <line x1="0" y1="36" x2="170" y2="36" stroke="#cbd5e1" stroke-width="1"/>
+          <line x1="0" y1="73" x2="170" y2="73" stroke="#cbd5e1" stroke-width="1"/>
+        `;
+      }
+
+      const oppX = sx > 85 ? 36 : 134;
+      let effectLayer = "";
+      if (visual === "sun_or_moon") {
+        effectLayer = `
+          <circle cx="${oppX}" cy="28" r="15" fill="rgba(14, 165, 233, 0.22)" stroke="#0ea5e9" stroke-width="1.3"/>
+          <circle cx="${oppX}" cy="28" r="21" fill="none" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="3 3"/>
+        `;
+      } else if (visual === "magic_or_light") {
+        const mx = sx > 85 ? 42 : 128;
+        effectLayer = `
+          <circle cx="${mx}" cy="68" r="20" fill="rgba(14, 165, 233, 0.14)" stroke="#0ea5e9" stroke-width="1.4"/>
+          <circle cx="${mx}" cy="68" r="12" fill="none" stroke="#0ea5e9" stroke-width="1.2" stroke-dasharray="3 2"/>
+        `;
+      } else if (visual === "speed_lines") {
+        effectLayer = `
+          <line x1="0" y1="12" x2="${sx - 24}" y2="${sy}" stroke="#0ea5e9" stroke-width="1.2"/>
+          <line x1="170" y1="12" x2="${sx + 24}" y2="${sy}" stroke="#0ea5e9" stroke-width="1.2"/>
+          <line x1="0" y1="95" x2="${sx - 24}" y2="${sy + 20}" stroke="#0ea5e9" stroke-width="1.2"/>
+          <line x1="170" y1="95" x2="${sx + 24}" y2="${sy + 20}" stroke="#0ea5e9" stroke-width="1.2"/>
+        `;
+      } else if (visual === "architecture_or_fence") {
+        const startX = sx > 85 ? 0 : 170;
+        effectLayer = `
+          <line x1="${startX}" y1="12" x2="${sx}" y2="${sy + 10}" stroke="#0ea5e9" stroke-width="1.3"/>
+          <line x1="${startX}" y1="102" x2="${sx}" y2="${sy + 45}" stroke="#0ea5e9" stroke-width="1.3"/>
+          <line x1="${(startX + sx) / 2}" y1="28" x2="${(startX + sx) / 2}" y2="92" stroke="#93c5fd" stroke-width="1"/>
+        `;
+      } else if (visual === "nature_or_clouds") {
+        effectLayer = `
+          <path d="M12,26 Q55,10 95,24 T162,18" fill="none" stroke="#0ea5e9" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <path d="M18,46 Q65,34 115,44" fill="none" stroke="#93c5fd" stroke-width="1.2"/>
+        `;
+      } else {
+        effectLayer = sx > 85
+          ? `<polygon points="0,110 56,62 76,110" fill="rgba(100, 116, 139, 0.34)" stroke="#64748b" stroke-width="1"/>`
+          : `<polygon points="170,110 114,62 94,110" fill="rgba(100, 116, 139, 0.34)" stroke="#64748b" stroke-width="1"/>`;
+      }
+
+      const markerId = `arrow-${idx}`;
+      let gazeLayer = "";
+      if (gaze === "left_to_right") {
+        const endX = Math.max(32, sx - headR - 5);
+        gazeLayer = `
+          <circle cx="20" cy="30" r="3.5" fill="#f97316"/>
+          <path d="M20,30 Q${(20 + endX) / 2},18 ${endX},${sy}" fill="none" stroke="#f97316" stroke-width="2" marker-end="url(#${markerId})"/>
+        `;
+      } else if (gaze === "right_to_left") {
+        const endX = Math.min(138, sx + headR + 5);
+        gazeLayer = `
+          <circle cx="150" cy="30" r="3.5" fill="#f97316"/>
+          <path d="M150,30 Q${(150 + endX) / 2},18 ${endX},${sy}" fill="none" stroke="#f97316" stroke-width="2" marker-end="url(#${markerId})"/>
+        `;
+      } else if (gaze === "bottom_to_top") {
+        const startY = 100;
+        const endY = Math.min(82, sy + headR + 8);
+        gazeLayer = `
+          <circle cx="${sx}" cy="${startY}" r="3.5" fill="#f97316"/>
+          <line x1="${sx}" y1="${startY}" x2="${sx}" y2="${endY}" stroke="#f97316" stroke-width="2" marker-end="url(#${markerId})"/>
+        `;
+      } else if (gaze === "converge_center") {
+        gazeLayer = `
+          <circle cx="${sx}" cy="${sy}" r="${headR + 6}" fill="none" stroke="#f97316" stroke-width="1.6" stroke-dasharray="3 2"/>
+          <line x1="18" y1="20" x2="${sx - headR - 5}" y2="${sy}" stroke="#f97316" stroke-width="1.8" marker-end="url(#${markerId})"/>
+        `;
+      } else {
+        const startX = sx > 85 ? 28 : 142;
+        const endX = sx > 85 ? sx - headR - 4 : sx + headR + 4;
+        gazeLayer = `
+          <circle cx="${startX}" cy="88" r="3.5" fill="#f97316"/>
+          <path d="M${startX},88 Q${(startX + endX) / 2},72 ${endX},${sy + 2}" fill="none" stroke="#f97316" stroke-width="2" marker-end="url(#${markerId})"/>
+        `;
+      }
+
+      return `
+        <svg width="170" height="110" viewBox="0 0 170 110" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="clip-${idx}">
+              <rect width="170" height="110" rx="6"/>
+            </clipPath>
+            <marker id="${markerId}" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#f97316"/>
+            </marker>
+          </defs>
+          <rect width="170" height="110" rx="6" fill="#ffffff" stroke="#cbd5e1"/>
+          <g clip-path="url(#clip-${idx})" transform="rotate(${tilt} 85 55)">
+            ${baseLayer}
+            ${effectLayer}
+            ${subjectSvg}
+            ${gazeLayer}
+          </g>
+        </svg>
+      `;
+    }
+
+    function renderCards(items, statusLabel) {
+      const container = document.getElementById("resultContainer");
+      const pill = document.getElementById("statusPill");
+
+      const html = `
+        <div class="cards-grid">
+          ${items.map((item, idx) => {
+            const scaleKey = normalizeScale(item.subject_scale);
+            const scaleText = SCALE_LABELS[scaleKey] || "バストアップ（胸より上）";
+            return `
+              <article class="comp-card">
+                <div class="sketch-box">
+                  <span class="sketch-scale-tag">${scaleText}</span>
+                  ${createSmartSketchSVG(item, idx)}
+                  <span class="sketch-caption">青:主役 / 水:光・効果 / 橙:視線</span>
+                </div>
+                <div>
+                  <span class="card-badge">${escapeHtml(item.tag)}</span>
+                  <h3 class="card-title">${escapeHtml(item.title)}</h3>
+                  <div class="spec-list">
+                    <div class="spec-item">
+                      <span class="spec-label">描画範囲</span>
+                      <span><strong>${scaleText}</strong></span>
+                    </div>
+                    <div class="spec-item">
+                      <span class="spec-label">カメラアングル</span>
+                      <span>${escapeHtml(item.angle)}</span>
+                    </div>
+                    <div class="spec-item">
+                      <span class="spec-label">キャラ配置</span>
+                      <span>${escapeHtml(item.layout)}</span>
+                    </div>
+                    <div class="spec-item">
+                      <span class="spec-label">視線誘導</span>
+                      <span>${escapeHtml(item.gaze)}</span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      `;
+
+      container.innerHTML = html;
+      pill.textContent = statusLabel;
+    }
+
+    async function handleGenerate() {
+      const prompt = document.getElementById("promptInput").value.trim();
+
+      if (currentMode === "demo") {
+        const btn = document.getElementById("submitBtn");
+        const emptyState = document.getElementById("emptyState");
+        const loader = document.getElementById("loader");
+        const container = document.getElementById("resultContainer");
+        const pill = document.getElementById("statusPill");
+
+        btn.disabled = true;
+        emptyState.style.display = "none";
+        container.innerHTML = "";
+        loader.style.display = "block";
+        pill.textContent = "読み込み中...";
+        startLoadingTimer(false);
+
+        setTimeout(() => {
+          stopLoadingTimer();
+          const items = DEMO_DATA[selectedPresetIndex] || DEMO_DATA[0];
+          loader.style.display = "none";
+          renderCards(items, "プレビュー表示完了（3件）");
+          btn.disabled = false;
+        }, 500);
+        return;
+      }
+
+      if (!prompt && selectedScale === "other" && selectedMood === "other") {
+        const emptyState = document.getElementById("emptyState");
+        const container = document.getElementById("resultContainer");
+        emptyState.style.display = "none";
+        container.innerHTML = `<div class="error-box">描画範囲・雰囲気を選ぶか、自由記述欄に描きたいイラストの条件を入力してください。</div>`;
+        return;
+      }
+
+      const btn = document.getElementById("submitBtn");
+      const emptyState = document.getElementById("emptyState");
+      const loader = document.getElementById("loader");
+      const container = document.getElementById("resultContainer");
+      const pill = document.getElementById("statusPill");
+
+      btn.disabled = true;
+      emptyState.style.display = "none";
+      container.innerHTML = "";
+      loader.style.display = "block";
+      pill.textContent = "生成中（最大約1分30秒）";
+      startLoadingTimer(true);
+
+      try {
+        const res = await fetch("/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: prompt,
+            scale: selectedScale,
+            mood: selectedMood
+          })
+        });
+        const data = await res.json();
+        stopLoadingTimer();
+        loader.style.display = "none";
+
+        if (data.error) {
+          container.innerHTML = `<div class="error-box">${escapeHtml(data.error)}</div>`;
+          pill.textContent = "エラー";
+        } else if (data.plans && Array.isArray(data.plans)) {
+          renderCards(data.plans, "AI生成完了（3件）");
+        } else {
+          container.innerHTML = `<div class="error-box">予期しないデータ形式が返されました。</div>`;
+          pill.textContent = "エラー";
+        }
+      } catch (err) {
+        stopLoadingTimer();
+        loader.style.display = "none";
+        container.innerHTML = `<div class="error-box">通信エラーが発生しました。サーバーが起動しているか確認してください。</div>`;
+        pill.textContent = "エラー";
+      } finally {
+        stopLoadingTimer();
+        btn.disabled = false;
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>
